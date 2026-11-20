@@ -9,5 +9,5 @@
             .hash = "N-V-__8AAFErgwCNiCUlyDAP9ZcGuLZwUDDiFQuldSS95W_a",
         },
     },
-    .paths = .{ "build.zig", "build.zig.zon", "main.zig" },
+    .paths = .{ "build.zig", "build.zig.zon", "src" },
 }

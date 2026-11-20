@@ -1,13 +1,19 @@
 const std = @import("std");
 
+// contents of the generated header (translated into the "c" module)
 const ch_content =
+    \\#include <time.h>
     \\#include "sokol_app.h"
     \\#include "sokol_gfx.h"
     \\#include "sokol_glue.h"
     \\#include "sokol_log.h"
+    \\#include "util/sokol_gl.h"
+    \\#include "util/sokol_debugtext.h"
+    \\#include "sokol_time.h"
     \\
 ;
 
+// contents of the generated sokol implementation file
 const impl_content =
     \\#define SOKOL_IMPL
     \\#define SOKOL_NO_ENTRY
@@ -15,6 +21,9 @@ const impl_content =
     \\#include "sokol_gfx.h"
     \\#include "sokol_glue.h"
     \\#include "sokol_log.h"
+    \\#include "util/sokol_gl.h"
+    \\#include "util/sokol_debugtext.h"
+    \\#include "sokol_time.h"
     \\
 ;
 
@@ -40,7 +49,7 @@ pub fn build(b: *std.Build) void {
     });
     translate_c.addIncludePath(sokol_inc);
 
-    // sokol implementation -> static library
+    // C code (the sokol implementation) -> static library
     const lib_mod = b.createModule(.{
         .target = target,
         .optimize = optimize,
@@ -77,7 +86,15 @@ pub fn build(b: *std.Build) void {
         .root_module = lib_mod,
     });
 
-    // main module + "c" module, linked against the static lib
+    // The solver searches for solvable boards, so keep it optimised even in
+    // Debug builds.
+    const solver_mod = b.createModule(.{
+        .root_source_file = b.path("src/solver.zig"),
+        .target = target,
+        .optimize = if (optimize == .debug) .ReleaseSafe else optimize,
+    });
+
+    // main module + "c" and "solver" modules, linked against the static lib
     const exe_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
@@ -85,14 +102,20 @@ pub fn build(b: *std.Build) void {
         .link_libc = true,
         .imports = &.{
             .{ .name = "c", .module = translate_c.createModule() },
+            .{ .name = "solver", .module = solver_mod },
         },
     });
     exe_mod.linkLibrary(lib);
 
-    const exe = b.addExecutable(.{ .name = "demo", .root_module = exe_mod });
+    const exe = b.addExecutable(.{ .name = "minesweeper", .root_module = exe_mod });
     b.installArtifact(exe);
 
     const run = b.addRunArtifact(exe);
     run.step.dependOn(b.getInstallStep());
-    b.step("run", "Run the demo").dependOn(&run.step);
+    b.step("run", "Run minesweeper").dependOn(&run.step);
+
+    // solver tests (no sokol / graphics needed)
+    const solver_tests = b.addTest(.{ .root_module = solver_mod });
+    const run_tests = b.addRunArtifact(solver_tests);
+    b.step("test", "Run solver tests").dependOn(&run_tests.step);
 }
