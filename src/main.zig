@@ -1,3 +1,4 @@
+const std = @import("std");
 const c = @import("c");
 
 var pass_action: c.sg_pass_action = .{};
